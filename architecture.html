@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Architecture — Factory Inventory Management</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f8fafc;
+    color: #0f172a;
+    line-height: 1.5;
+    padding: 40px 20px;
+  }
+  .container { max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 28px; font-weight: 600; margin-bottom: 6px; }
+  .subtitle { color: #64748b; font-size: 14px; margin-bottom: 36px; }
+  h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #64748b;
+    font-weight: 600;
+    margin: 36px 0 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  /* ─── Architecture diagram ─── */
+  .arch {
+    display: grid;
+    grid-template-columns: 1fr 60px 1fr 60px 1fr;
+    gap: 0;
+    align-items: stretch;
+  }
+  .tier {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 18px;
+  }
+  .tier-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #64748b;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .tier-name { font-size: 16px; font-weight: 600; margin-bottom: 2px; }
+  .tier-port { font-size: 12px; color: #64748b; margin-bottom: 14px; font-family: ui-monospace, Menlo, monospace; }
+  .tier ul { list-style: none; }
+  .tier li {
+    font-size: 12px;
+    color: #475569;
+    padding: 4px 0;
+    font-family: ui-monospace, Menlo, monospace;
+  }
+  .tier li.group {
+    font-family: inherit;
+    font-weight: 600;
+    color: #0f172a;
+    margin-top: 8px;
+  }
+  .tier li.group:first-child { margin-top: 0; }
+  .arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    font-size: 11px;
+    gap: 4px;
+  }
+  .arrow svg { width: 32px; height: 16px; }
+  .arrow .label { font-family: ui-monospace, Menlo, monospace; }
+
+  /* ─── Stack grid ─── */
+  .stack {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .card-title { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+  .card table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .card td { padding: 4px 0; vertical-align: top; }
+  .card td:first-child { color: #64748b; width: 40%; }
+  .card td:last-child { font-family: ui-monospace, Menlo, monospace; color: #0f172a; }
+
+  /* ─── Data flow ─── */
+  .flow { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; }
+  .flow ol { list-style: none; counter-reset: step; }
+  .flow li {
+    counter-increment: step;
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: 14px;
+    padding: 10px 0;
+    font-size: 13px;
+    align-items: start;
+  }
+  .flow li + li { border-top: 1px solid #f1f5f9; }
+  .flow li::before {
+    content: counter(step);
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: #0f172a;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .flow code {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 12px;
+    background: #f1f5f9;
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+
+  /* ─── Endpoints table ─── */
+  .endpoints {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .endpoints table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .endpoints th {
+    text-align: left;
+    padding: 10px 14px;
+    background: #f8fafc;
+    font-weight: 600;
+    color: #64748b;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .endpoints td { padding: 8px 14px; border-bottom: 1px solid #f1f5f9; }
+  .endpoints tr:last-child td { border-bottom: none; }
+  .endpoints td:first-child { font-family: ui-monospace, Menlo, monospace; white-space: nowrap; }
+  .endpoints td:nth-child(2) { font-family: ui-monospace, Menlo, monospace; color: #475569; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: inherit;
+  }
+  .badge.get { background: #dbeafe; color: #1e40af; }
+  .badge.post { background: #dcfce7; color: #166534; }
+  .badge.patch { background: #fef3c7; color: #92400e; }
+  .badge.delete { background: #fee2e2; color: #991b1b; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>Factory Inventory Management</h1>
+  <p class="subtitle">System architecture, tech stack, and request lifecycle</p>
+
+  <!-- ─────────────────────────── ARCHITECTURE ─────────────────────────── -->
+  <h2>System Architecture</h2>
+  <div class="arch">
+
+    <div class="tier">
+      <div class="tier-title">Client</div>
+      <div class="tier-name">Vue 3 SPA</div>
+      <div class="tier-port">localhost:3000</div>
+      <ul>
+        <li class="group">Views (Routes)</li>
+        <li>Dashboard</li>
+        <li>Inventory</li>
+        <li>Orders</li>
+        <li>Demand</li>
+        <li>Spending</li>
+        <li>Reports</li>
+        <li class="group">Composables</li>
+        <li>useFilters</li>
+        <li>useAuth</li>
+        <li>useI18n</li>
+        <li class="group">Components</li>
+        <li>FilterBar</li>
+        <li>6&times; Detail Modals</li>
+        <li>ProfileMenu</li>
+      </ul>
+    </div>
+
+    <div class="arrow">
+      <span class="label">axios</span>
+      <svg viewBox="0 0 32 16"><path d="M0 8 H28 M22 2 L28 8 L22 14" stroke="#94a3b8" stroke-width="1.5" fill="none"/></svg>
+      <span class="label">JSON</span>
+      <svg viewBox="0 0 32 16"><path d="M32 8 H4 M10 2 L4 8 L10 14" stroke="#94a3b8" stroke-width="1.5" fill="none"/></svg>
+    </div>
+
+    <div class="tier">
+      <div class="tier-title">Server</div>
+      <div class="tier-name">FastAPI</div>
+      <div class="tier-port">localhost:8001</div>
+      <ul>
+        <li class="group">Routing &amp; CORS</li>
+        <li>main.py</li>
+        <li class="group">Pydantic Models</li>
+        <li>InventoryItem</li>
+        <li>Order</li>
+        <li>DemandForecast</li>
+        <li>BacklogItem</li>
+        <li>PurchaseOrder</li>
+        <li class="group">Data Access</li>
+        <li>mock_data.py</li>
+      </ul>
+    </div>
+
+    <div class="arrow">
+      <span class="label">load</span>
+      <svg viewBox="0 0 32 16"><path d="M0 8 H28 M22 2 L28 8 L22 14" stroke="#94a3b8" stroke-width="1.5" fill="none"/></svg>
+      <span class="label">dict</span>
+      <svg viewBox="0 0 32 16"><path d="M32 8 H4 M10 2 L4 8 L10 14" stroke="#94a3b8" stroke-width="1.5" fill="none"/></svg>
+    </div>
+
+    <div class="tier">
+      <div class="tier-title">Data</div>
+      <div class="tier-name">In-Memory JSON</div>
+      <div class="tier-port">server/data/</div>
+      <ul>
+        <li class="group">Loaded at startup</li>
+        <li>inventory.json</li>
+        <li>orders.json</li>
+        <li>demand_forecasts.json</li>
+        <li>backlog_items.json</li>
+        <li>purchase_orders.json</li>
+        <li>spending.json</li>
+        <li>transactions.json</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- ─────────────────────────── TECH STACK ─────────────────────────── -->
+  <h2>Tech Stack</h2>
+  <div class="stack">
+
+    <div class="card">
+      <div class="card-title">Frontend</div>
+      <table>
+        <tr><td>Framework</td><td>Vue 3 (Composition API)</td></tr>
+        <tr><td>Router</td><td>vue-router 4</td></tr>
+        <tr><td>HTTP</td><td>axios</td></tr>
+        <tr><td>Build</td><td>Vite 5</td></tr>
+        <tr><td>Charts</td><td>Custom SVG</td></tr>
+        <tr><td>Layout</td><td>CSS Grid</td></tr>
+        <tr><td>i18n</td><td>en / ja locales</td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Backend</div>
+      <table>
+        <tr><td>Framework</td><td>FastAPI</td></tr>
+        <tr><td>Server</td><td>Uvicorn (ASGI)</td></tr>
+        <tr><td>Validation</td><td>Pydantic v2</td></tr>
+        <tr><td>Runtime</td><td>Python 3.13</td></tr>
+        <tr><td>Package mgr</td><td>uv</td></tr>
+        <tr><td>Testing</td><td>pytest + httpx</td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Data Layer</div>
+      <table>
+        <tr><td>Storage</td><td>JSON files on disk</td></tr>
+        <tr><td>Loading</td><td>Once at startup</td></tr>
+        <tr><td>State</td><td>Held in memory</td></tr>
+        <tr><td>Filtering</td><td>Python list comps</td></tr>
+        <tr><td>Persistence</td><td>None (mock data)</td></tr>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- ─────────────────────────── DATA FLOW ─────────────────────────── -->
+  <h2>Request Lifecycle</h2>
+  <div class="flow">
+    <ol>
+      <li><div>User changes a filter in <code>FilterBar.vue</code> &rarr; updates reactive refs in the <code>useFilters</code> composable.</div></li>
+      <li><div>View component <code>watch()</code>es filter refs and calls <code>api.js</code>, which builds <code>URLSearchParams</code> from non-<code>'all'</code> values.</div></li>
+      <li><div>Axios fires <code>GET http://localhost:8001/api/...?warehouse=X&amp;category=Y</code> across CORS to FastAPI.</div></li>
+      <li><div>FastAPI route handler in <code>main.py</code> reads query params, filters in-memory lists from <code>mock_data.py</code> via list comprehension.</div></li>
+      <li><div>Pydantic <code>response_model</code> validates &amp; serializes the filtered result &rarr; JSON response.</div></li>
+      <li><div>Response lands in a Vue <code>ref</code> &rarr; <code>computed</code> properties re-derive chart data &amp; aggregates &rarr; template re-renders.</div></li>
+    </ol>
+  </div>
+
+  <!-- ─────────────────────────── ENDPOINTS ─────────────────────────── -->
+  <h2>API Endpoints</h2>
+  <div class="endpoints">
+    <table>
+      <thead>
+        <tr><th>Method</th><th>Path</th><th>Filters</th><th>Returns</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><span class="badge get">GET</span></td><td>/api/inventory</td><td>warehouse, category</td><td>List[InventoryItem]</td></tr>
+        <tr><td><span class="badge get">GET</span></td><td>/api/inventory/{id}</td><td>&mdash;</td><td>InventoryItem</td></tr>
+        <tr><td><span class="badge get">GET</span></td><td>/api/orders</td><td>warehouse, category, status, month</td><td>List[Order]</td></tr>
+        <tr><td><span class="badge get">GET</span></td><td>/api/orders/{id}</td><td>&mdash;</td><td>Order</td></tr>
+        <tr><td><span class="badge get">GET</span></td><td>/api/demand</td><td>&mdash;</td><td>List[DemandForecast]</td></tr>
+        <tr><td><span class="badge get">GET</span></td><td>/api/backlog</td><td>&mdash;</td><td>List[BacklogItem]</td></tr>
+        <tr><td><span class="badge get">GET</span></td><td>/api/dashboard/summary</td><td>warehouse, category, status, month</td><td>Aggregated metrics</td></tr>
+        <tr><td><span class="badge get">GET</span></td><td>/api/spending/summary</td><td>&mdash;</td><td>Spending totals</td></tr>
+        <tr><td><span class="badge get">GET</span></td><td>/api/spending/monthly</td><td>&mdash;</td><td>Monthly breakdown</td></tr>
+        <tr><td><span class="badge get">GET</span></td><td>/api/spending/categories</td><td>&mdash;</td><td>Category breakdown</td></tr>
+        <tr><td><span class="badge get">GET</span></td><td>/api/spending/transactions</td><td>&mdash;</td><td>Transaction list</td></tr>
+        <tr><td><span class="badge get">GET</span></td><td>/api/reports/quarterly</td><td>&mdash;</td><td>Quarterly report</td></tr>
+        <tr><td><span class="badge get">GET</span></td><td>/api/reports/monthly-trends</td><td>&mdash;</td><td>Trend data</td></tr>
+        <tr><td><span class="badge get">GET</span></td><td>/api/tasks</td><td>&mdash;</td><td>Task list</td></tr>
+        <tr><td><span class="badge post">POST</span></td><td>/api/tasks</td><td>&mdash;</td><td>Created task</td></tr>
+        <tr><td><span class="badge patch">PATCH</span></td><td>/api/tasks/{id}</td><td>&mdash;</td><td>Toggled task</td></tr>
+        <tr><td><span class="badge delete">DELETE</span></td><td>/api/tasks/{id}</td><td>&mdash;</td><td>&mdash;</td></tr>
+        <tr><td><span class="badge post">POST</span></td><td>/api/purchase-orders</td><td>&mdash;</td><td>PurchaseOrder</td></tr>
+        <tr><td><span class="badge get">GET</span></td><td>/api/purchase-orders/{backlog_id}</td><td>&mdash;</td><td>PurchaseOrder</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+</body>
+</html>

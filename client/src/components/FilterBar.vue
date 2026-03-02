@@ -103,17 +103,14 @@ export default {
 <style scoped>
 .filters-bar {
   background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
-  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--surface-border);
+  padding: var(--space-3) var(--space-6);
   position: sticky;
-  top: 70px;
-  z-index: 90;
+  top: 0;
+  z-index: 10;
 }
 
 .filters-container {
-  max-width: 1600px;
-  margin: 0 auto;
-  padding: 0 2rem;
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -135,7 +132,7 @@ export default {
 .filter-group label {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #64748b;
+  color: var(--text-tertiary);
   white-space: nowrap;
 }
 
